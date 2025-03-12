@@ -2,7 +2,16 @@ const UserModel = require("../models/userModel");
 const bcrypt = require("bcrypt");
 const asyncHandle = require("express-async-handler");
 const jwt = require("jsonwebtoken");
-
+const nodemailer = require("nodemailer");
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true, // true for port 465, false for other ports
+  auth: {
+    user: "soc.sucao1@gmail.com",
+    pass: "hipv odec hddq qime",
+  },
+});
 const getJsonWebToken = async (email, id) => {
   const payload = {
     email,
@@ -14,6 +23,39 @@ const getJsonWebToken = async (email, id) => {
   });
   return token;
 };
+
+const handleSendMail = async (val, email) => {
+  try {
+    await transporter.sendMail({
+      from: '"Maddison Foo Koch 👻" <soc.sucao1@gmail.com>', // sender address
+      to: email, // list of receivers
+      subject: "Hello ✔", // Subject line
+      text: "Hello world?", // plain text body
+      html: `<h1>${val}<h1>`, // html body
+    });
+    return "OK";
+  } catch (error) {
+    return "Error";
+  }
+};
+// handleSendMail("sssss");
+
+const verification = asyncHandle(async (req, res) => {
+  const { email } = req.body;
+  const verificationCode = Math.round(1000 + Math.random() * 9000);
+  try {
+    await handleSendMail(verificationCode, email);
+    res.status(200).json({
+      message: "Verification email has been sent successfully",
+      code: verificationCode,
+    });
+  } catch (error) {
+    res.status(401);
+
+    console.log("can not send email", error);
+  }
+});
+
 const register = asyncHandle(async (req, res) => {
   const { email, fullname, password } = req.body;
 
@@ -73,7 +115,44 @@ const login = asyncHandle(async (req, res) => {
     },
   });
 });
+const forgotPassWord = asyncHandle(async (req, res) => {
+  const { email } = req.body;
+
+  const rsPasswordCode = Math.round(10000 + Math.random() * 90000);
+  const user = await UserModel.findOne({ email });
+  if (user) {
+    const salt = await bcrypt.genSalt(10);
+    const hashPassword = await bcrypt.hash(`${rsPasswordCode}`, salt);
+
+    await UserModel.findByIdAndUpdate(user._id, {
+      password: hashPassword,
+      isChangedPassWord: true,
+    })
+      .then(() => {
+        console.log("Reset password successfully");
+      })
+      .catch((error) => {
+        console.log("Error reset password", error);
+      });
+    await handleSendMail(rsPasswordCode, email)
+      .then(() => {
+        res.status(200).json({
+          message: "Reset password email has been sent successfully",
+          data: [],
+        });
+      })
+      .catch((error) => {
+        res.status(401);
+        console.log("===error==forgotPassWord==", error);
+      });
+  } else {
+    res.status(401);
+    console.log(error);
+  }
+});
 module.exports = {
   register,
   login,
+  verification,
+  forgotPassWord,
 };
