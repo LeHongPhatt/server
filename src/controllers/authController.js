@@ -150,9 +150,39 @@ const forgotPassWord = asyncHandle(async (req, res) => {
     console.log(error);
   }
 });
+const LoginGoogle = asyncHandle(async (req, res) => {
+  const userInfo = req.body;
+  const existingUser = await UserModel.findOne({ email: userInfo.email });
+  let user = { ...userInfo };
+  if (existingUser) {
+    if (existingUser) {
+      await UserModel.findByIdAndUpdate(existingUser.id, {
+        ...userInfo,
+        updateAt: Date.now(),
+      });
+      console.log("Updated");
+
+      user.accesstoken = await getJsonWebToken(userInfo.email, userInfo.id);
+    }
+  } else {
+    const newUser = new UserModel({
+      email: userInfo.email,
+      fullname: userInfo.name,
+      ...userInfo,
+    });
+    await newUser.save();
+    console.log("Saved");
+    user.accesstoken = await getJsonWebToken(userInfo.email, newUser.id);
+  }
+  res.status(200).json({
+    message: "Login google successfully",
+    data: user,
+  });
+});
 module.exports = {
   register,
   login,
   verification,
   forgotPassWord,
+  LoginGoogle,
 };
